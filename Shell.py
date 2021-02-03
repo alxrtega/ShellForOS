@@ -11,9 +11,10 @@ class Shell:
     def prompt(self):
         while 1:
             terminal = self.pathLine()
-            os.write(1, (terminal + "\n").encode())
             if terminal == "exit":
                 sys.exit(0)
+            else:
+                self.execute(terminal)
 
     def pathLine(self):
         terminal = os.getcwd() + "\n$ "
@@ -23,5 +24,22 @@ class Shell:
         userInput = userInput[0]
         userInput = str(userInput)
         return userInput
+
+    def execute(self, command):
+        pid = os.fork() 
+        if pid == 0: 
+            line = command.split()
+            for dir in re.split(":", os.environ['PATH']):
+                program = "%s/%s" % (dir, line[0])
+                try:
+                    os.execve(program, line, os.environ) 
+                except:                
+                    pass
+            print("Shell: "+ line[0] +" command not found")
+            sys.exit(0)
+        elif pid > 0 : 
+            os.wait() 
+        else:
+            print("fork() failed")
 
 shell = Shell()
