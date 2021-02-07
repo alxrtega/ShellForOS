@@ -26,6 +26,16 @@ class Shell:
                 self.changeDirectory(command[1])
             elif ">" in command or "<" in command:
                 self.redirection(command)
+            elif "&" in command:
+                self.runEXECVE(command)
+            elif "|" in command:
+                pid = os.fork() 
+                if pid == 0: 
+                    self.piping(command)
+                elif pid > 0: 
+                    os.wait() 
+                else: # pid < 0 => error
+                    print("fork() failed")
             else:
                 self.execute(command)
 
@@ -50,7 +60,7 @@ class Shell:
             self.runEXECVE(command)
         elif pid > 0: 
             os.wait() 
-        else:
+        else: # pid < 0 => error
             print("fork() failed")
 
     def runEXECVE(self, command):
@@ -76,6 +86,7 @@ class Shell:
             else:
                 command = command.split("<")
                 os.close(0)
+                command[1] = command[1].strip()
                 os.open(command[1], os.O_RDONLY)
                 os.set_inheritable(0, True)
 
@@ -84,5 +95,28 @@ class Shell:
             os.wait()
         else:
             print("redirection() failed")
+
+    def piping(self, command):
+        command = command.split("|", 1)
+        first    = command[0]
+        second   = command[1]
+        inputPipe, outputPipe = os.pipe()
+        pid = os.fork()
+        if pid == 0: # child
+            os.close(1)
+            os.dup(outputPipe)
+            os.set_inheritable(1, True)
+            for fd in (inputPipe, outputPipe):
+                os.close(fd)
+            self.runEXECVE(first)
+        elif pid > 0: # parent
+            os.close(0)
+            os.dup(inputPipe)
+            os.set_inheritable(0, True)
+            for fd in (outputPipe, inputPipe):
+                os.close(fd)
+            if "|" in second: # in case there are more commands
+                self.piping(second)
+            self.runEXECVE(second)
 
 shell = Shell()
